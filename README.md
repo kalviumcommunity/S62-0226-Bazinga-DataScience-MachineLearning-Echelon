@@ -1,6 +1,6 @@
     # Echelon - Role-Aware Privileged Access Risk Scoring System with Usage Intelligence
 
-------------------------------------------------------------------------
+-----------------------------------------------------------
 
 ## Problem Statement
 
@@ -32,7 +32,7 @@ relying on labeled incident data.
 We are solving a governance visibility problem, not a threat detection
 problem.
 
-**Core Question:**
+**Core Question:**\
 Among users who are legitimately allowed to access sensitive systems,
 whose access patterns indicate increasing governance risk,
 over-privilege, or behavioral inconsistency compared to peers in the
@@ -44,9 +44,9 @@ The system does NOT:
 - Enforce policies
 
 The system DOES: 
-- Measure behavioral deviation\
-- Quantify privilege--usage misalignment\
-- Track behavioral stability over time\
+- Measure behavioral deviation
+- Quantify privilege--usage misalignment
+- Track behavioral stability over time
 - Provide explainable governance risk scores
 
 ------------------------------------------------------------------------
@@ -127,29 +127,29 @@ Normalize final score to 0-100.
 
 ### Unsupervised Anomaly Detection
 
-Algorithm: Isolation Forest
+Algorithm: Isolation Forest\
 Purpose: Learn normal behavior per role and detect deviations without
 labels.
 
 ### Representation Learning
 
-Technique: PCA or Autoencoders
+Technique: PCA or Autoencoders\
 Purpose: Reduce feature dimensionality and capture latent behavioral
 structure.
 
 ### Behavioral Clustering
 
-Algorithms: K-Means / DBSCAN
+Algorithms: K-Means / DBSCAN\
 Purpose: Identify access archetypes and behavioral segments.
 
 ### Distance-Based Risk Modeling
 
-Techniques: Euclidean / Mahalanobis Distance
+Techniques: Euclidean / Mahalanobis Distance\
 Purpose: Quantify privilege--usage misalignment.
 
 ### Temporal Drift & Stability Modeling
 
-Rolling statistics, variance tracking, trend detection.
+Rolling statistics, variance tracking, trend detection.\
 Purpose: Detect long-term instability and governance risk.
 
 ### Ensemble Risk Scoring
@@ -181,10 +181,10 @@ Provide human-readable governance insights.
 
 ## Tools & Technologies
 
-Programming: Python
-Data Handling: Pandas, NumPy
-Visualization: Matplotlib, Seaborn
-Machine Learning: Scikit-learn
+Programming: Python\
+Data Handling: Pandas, NumPy\
+Visualization: Matplotlib, Seaborn\
+Machine Learning: Scikit-learn\
 Optional Dashboard: Streamlit
 
 ------------------------------------------------------------------------
@@ -196,4 +196,3 @@ applied to a realistic enterprise governance problem. It combines
 feature engineering, statistical modeling, unsupervised learning,
 ensemble risk synthesis, temporal analysis, and explainability to build
 a decision-support system that enhances privileged access governance.
-
