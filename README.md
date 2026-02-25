@@ -196,3 +196,97 @@ applied to a realistic enterprise governance problem. It combines
 feature engineering, statistical modeling, unsupervised learning,
 ensemble risk synthesis, temporal analysis, and explainability to build
 a decision-support system that enhances privileged access governance.
+
+---
+
+
+---
+## Installing Python and Anaconda on Local Machine
+
+### Objective
+
+This milestone ensures that the local system is properly configured for
+Data Science and Machine Learning development.\
+The setup establishes a stable environment that will be used throughout
+the sprint for notebooks, scripts, ML models, and deployment workflows.
+
+------------------------------------------------------------------------
+
+### System Information
+
+-   **Operating System:** Windows 11 (64-bit)
+-   **Python Version:** 3.13.9 (Anaconda distribution)
+-   **Anaconda Version:** Conda 26.1.0
+-   **Active Environment:** base
+
+------------------------------------------------------------------------
+
+### Installation Process
+
+**1. Python Verification**
+
+Python was verified through the terminal using the following commands:
+
+python --version
+
+Output:
+
+Python 3.13.9
+
+Python interactive shell test:
+
+python print("Python Working") exit()
+
+Output:
+
+Python Working
+
+![Python Verification](docs/python_version_verification.png)
+
+------------------------------------------------------------------------
+
+**2️. Anaconda Installation & Verification**
+
+Anaconda was installed using the official Windows installer.
+
+*Verification commands:*
+
+conda --version conda env list
+
+*Output:*
+
+conda 26.1.0
+
+*conda environments:*
+
+# 
+
+#### base \* C:`\Users`{=tex}`\varsha`{=tex}`\anaconda3`{=tex}
+
+*Environment activation:*
+
+conda activate base
+
+![Python Verification](docs/conda_verification.png.png)
+
+
+------------------------------------------------------------------------
+
+**3️. Environment Validation**
+
+The environment was validated by:
+
+-   Launching Python via terminal
+-   Running a basic print statement
+-   Confirming Conda environment activation
+-   Ensuring Jupyter Notebook can launch successfully
+
+Command used:
+
+jupyter notebook
+
+Jupyter successfully started at:
+
+http://localhost:8888/
+
+![Python Verification](docs/jupyter_running.png)
