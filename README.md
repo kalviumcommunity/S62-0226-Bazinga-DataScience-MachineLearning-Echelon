@@ -290,3 +290,89 @@ Jupyter successfully started at:
 http://localhost:8888/
 
 ![Python Verification](docs/jupyter_running.png)
+
+------------------------------------------------------------------------
+## Project Structure
+
+The project is organized into the following directory structure:
+
+``` 
+echelon/
+├── README.md
+├── requirements.txt
+├── .gitignore
+├── data/
+│ ├── raw/
+│ ├── processed/
+│ └── external/
+├── notebooks/
+│ ├── 01_data_exploration.ipynb
+│ ├── 02_data_cleaning.ipynb
+│ ├── 03_feature_engineering.ipynb
+│ ├── 04_statistical_analysis.ipynb
+│ └── 05_visualization.ipynb
+├── src/
+│ ├── data/
+│ ├── features/
+│ ├── visualization/
+│ └── utils/
+├── outputs/
+│ ├── figures/
+│ └── reports/
+├── docs/
+│   ├── setup_verification.png
+│   ├── project_plan.md
+│   └── data_dictionary.md
+└── scripts/
+    ├── generate_data.py
+    └── run_analysis.py
+```
+
+
+---
+
+## Folder Overview
+
+### data/
+Stores datasets used in the project.
+- **raw/** – Original immutable data files.
+- **processed/** – Cleaned and transformed data.
+- **external/** – Optional reference datasets.
+
+### notebooks/
+Contains the step-by-step analytical workflow:
+1. Data Exploration  
+2. Data Cleaning  
+3. Feature Engineering  
+4. Statistical Analysis  
+5. Visualization  
+
+### src/
+Reusable Python modules organized by responsibility:
+- **data/** – Data loading and cleaning logic  
+- **features/** – Feature engineering logic  
+- **visualization/** – Plotting utilities  
+- **utils/** – Helper functions  
+
+### outputs/
+Generated artifacts:
+- **figures/** – Charts and visualizations  
+- **reports/** – Generated summaries and documentation  
+
+### docs/
+Project documentation and planning materials.
+
+### scripts/
+Standalone scripts for automation (e.g., data generation and pipeline execution).
+
+---
+
+## Data Flow
+
+→ Raw Data  
+→ Cleaning  
+→ Feature Engineering  
+→ Statistical Analysis  
+→ Visualization & Reporting  
+
+This structure ensures modularity, reproducibility, and scalability for further Machine Learning integration.
