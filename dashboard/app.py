@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
+import numpy as np
+import plotly.colors as pc
 
 st.set_page_config(
     page_title="Echelon · Risk Intelligence",
@@ -15,6 +17,12 @@ if "show_dashboard" not in st.session_state:
 @st.cache_data
 def load_data():
     df = pd.read_csv("notebooks/processed_user_risk_data.csv")
+
+    df["anomaly_label"] = pd.to_numeric(df.get("anomaly_label"), errors="coerce").fillna(1).astype(int)
+    for c in ["ml_risk_score", "governance_risk_score", "pca1", "pca2"]:
+        if c in df.columns:
+            df[c] = pd.to_numeric(df[c], errors="coerce")
+
     df["anomaly_label_str"] = df["anomaly_label"].map({1: "Normal", -1: "Anomaly"}).fillna("Unknown")
     return df
 
@@ -160,7 +168,7 @@ st.markdown('<div class="dash-wrap">', unsafe_allow_html=True)
 PLOT_BG  = "#161b27"
 GRID_CLR = "#1e2a3a"
 TEXT_CLR = "#94a3b8"
-FONT_FAM = "Inter, sans-serif"
+FONT_FAM = "'JetBrains Mono', monospace"
 
 def dark_layout(fig, title="", height=340):
     layout_updates = dict(
@@ -210,11 +218,42 @@ filtered = df[df["ml_risk_score"] >= risk_threshold]
 if selected_role != "All Roles":
     filtered = filtered[filtered["role"] == selected_role]
 
-# ── KPIs ─────────────────────────────────────────────
-total_users_f   = filtered["user_id"].nunique()
-anomalous_f     = df.loc[df["anomaly_label"] == -1, "user_id"].nunique()
+if filtered.empty:
+    st.info("No data for the selected filters. Try lowering the ML risk threshold or choosing another role.")
+    st.stop()
+
+user_view = (
+    filtered
+    .groupby("user_id", as_index=False)
+    .agg(
+        governance_risk_score=("governance_risk_score", "mean"),
+        ml_risk_score=("ml_risk_score", "mean"),
+        role=("role", "first"),
+        risk_category=("risk_category", lambda x: x.mode().iat[0] if not x.mode().empty else "—"),
+        events=("user_id", "size"),
+        anomaly_label=("anomaly_label", lambda s: -1 if (s == -1).any() else 1),
+    )
+)
+user_view["anomaly_label_str"] = user_view["anomaly_label"].map({1: "Normal", -1: "Anomaly"}).fillna("Unknown")
+
+pca_view = (
+    filtered
+    .groupby("user_id", as_index=False)
+    .agg(
+        pca1=("pca1", "mean"),
+        pca2=("pca2", "mean"),
+    )
+    .merge(
+        user_view[["user_id", "ml_risk_score", "role", "events", "anomaly_label", "anomaly_label_str"]],
+        on="user_id",
+        how="left",
+    )
+)
+
+total_users_f   = user_view["user_id"].nunique()
+anomalous_f     = (user_view["anomaly_label"] == -1).sum()
 high_risk_pct_f = (filtered["risk_category"] == "High").mean() * 100
-avg_ml_score_f  = filtered["ml_risk_score"].mean()
+avg_ml_score_f  = user_view["ml_risk_score"].mean()
 
 st.markdown(f"""
 <div class="kpi-grid">
@@ -241,7 +280,6 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# ── Row 1 ─────────────────────────────────────────────
 col1, col2 = st.columns([1, 1], gap="medium")
 
 with col1:
@@ -249,19 +287,29 @@ with col1:
         <div class="section-dot" style="background:#3b82f6;"></div>
         <h3>ML Risk Score Distribution</h3>
     </div>""", unsafe_allow_html=True)
+
+    scores = filtered["ml_risk_score"].dropna().astype(float).clip(0, 100)
+    edges = np.linspace(0, 100, 31)
+    counts, _ = np.histogram(scores, bins=edges)
+
+    bin_labels = [f"{int(edges[i])}-{int(edges[i+1])}" for i in range(len(edges) - 1)]
+    bin_centers = (edges[:-1] + edges[1:]) / 2
+
+    colorscale = [[0, "#1d4ed8"], [0.5, "#7c3aed"], [1, "#dc2626"]]
+    denom = (bin_centers.max() - bin_centers.min()) or 1.0
+    tvals = (bin_centers - bin_centers.min()) / denom
+    bar_colors = [pc.sample_colorscale(colorscale, float(t))[0] for t in tvals]
+
     fig1 = go.Figure()
-    fig1.add_trace(go.Histogram(
-        x=filtered["ml_risk_score"], nbinsx=30,
-        marker=dict(
-            color=filtered["ml_risk_score"],
-            colorscale=[[0, "#1d4ed8"], [0.5, "#7c3aed"], [1, "#dc2626"]],
-            line=dict(width=0),
-        ),
-        hovertemplate="Score: %{x:.0f}<br>Count: %{y}<extra></extra>",
+    fig1.add_trace(go.Bar(
+        x=bin_labels,
+        y=counts,
+        marker=dict(color=bar_colors, line=dict(width=0)),
+        hovertemplate="Score bin: %{x}<br>Count: %{y:,}<extra></extra>",
     ))
     dark_layout(fig1, height=300)
     fig1.update_layout(showlegend=False, bargap=0.04)
-    fig1.update_xaxes(title_text="ML Risk Score", title_font=dict(size=11))
+    fig1.update_xaxes(title_text="ML Risk Score (bin)", title_font=dict(size=11))
     fig1.update_yaxes(title_text="Events", title_font=dict(size=11))
     st.plotly_chart(fig1, use_container_width=True, config={"displayModeBar": False})
 
@@ -270,21 +318,36 @@ with col2:
         <div class="section-dot" style="background:#8b5cf6;"></div>
         <h3>ML vs Statistical Risk</h3>
     </div>""", unsafe_allow_html=True)
+
     fig2 = px.scatter(
-        filtered, x="governance_risk_score", y="ml_risk_score",
+        user_view,
+        x="governance_risk_score",
+        y="ml_risk_score",
         color="risk_category",
+        size="events",
+        size_max=14,
         color_discrete_map={"Low": "#22c55e", "Medium": "#f59e0b", "High": "#ef4444"},
-        opacity=0.45,
-        hover_data={"user_id": True, "role": True, "risk_category": True,
-                    "governance_risk_score": ":.1f", "ml_risk_score": ":.1f"},
-        labels={"governance_risk_score": "Governance Risk Score", "ml_risk_score": "ML Risk Score"},
+        opacity=0.75,
+        hover_data={
+            "user_id": True,
+            "role": True,
+            "risk_category": True,
+            "events": True,
+            "governance_risk_score": ":.1f",
+            "ml_risk_score": ":.1f",
+        },
+        labels={
+            "governance_risk_score": "Governance Risk Score (avg per user)",
+            "ml_risk_score": "ML Risk Score (avg per user)",
+            "events": "Events",
+        },
+        render_mode="webgl",
     )
     dark_layout(fig2, height=300)
-    fig2.update_traces(marker=dict(size=5))
+    fig2.update_traces(marker=dict(line=dict(width=0)))
     fig2.update_layout(legend_title_text="Risk level", legend=dict(orientation="h", y=-0.2))
     st.plotly_chart(fig2, use_container_width=True, config={"displayModeBar": False})
 
-# ── Row 2 ─────────────────────────────────────────────
 col3, col4 = st.columns([3, 2], gap="medium")
 
 with col3:
@@ -292,22 +355,34 @@ with col3:
         <div class="section-dot" style="background:#06b6d4;"></div>
         <h3>Behavioral Space — PCA Projection</h3>
     </div>""", unsafe_allow_html=True)
+
     fig3 = px.scatter(
-        filtered, x="pca1", y="pca2",
+        pca_view,
+        x="pca1", y="pca2",
         color="anomaly_label_str",
-        color_discrete_map={"Normal": "#3b82f6", "Anomaly": "#ef4444"},
+        color_discrete_map={"Normal": "#3b82f6", "Anomaly": "#ef4444", "Unknown": "#94a3b8"},
         symbol="anomaly_label_str",
-        symbol_map={"Normal": "circle", "Anomaly": "x"},
-        size="ml_risk_score", size_max=10, opacity=0.65,
-        hover_data={"user_id": True, "role": True, "ml_risk_score": ":.1f",
-                    "pca1": False, "pca2": False, "anomaly_label_str": False},
+        symbol_map={"Normal": "circle", "Anomaly": "x", "Unknown": "diamond"},
+        size="ml_risk_score",
+        size_max=14,
+        opacity=0.8,
+        render_mode="webgl",
+        hover_data={
+            "user_id": True,
+            "role": True,
+            "events": True,
+            "ml_risk_score": ":.1f",
+            "pca1": ":.2f",
+            "pca2": ":.2f",
+        },
         labels={"pca1": "PC 1", "pca2": "PC 2", "anomaly_label_str": ""},
     )
-    fig3.update_traces(selector=dict(name="Anomaly"),
-                       marker=dict(size=10, line=dict(width=1.5, color="#ef4444")))
+    fig3.update_traces(
+        selector=dict(name="Anomaly"),
+        marker=dict(size=10, line=dict(width=1.5, color="#ef4444")),
+    )
     dark_layout(fig3, height=360)
-    fig3.update_layout(legend=dict(orientation="h", y=1.08, x=0,
-                                   font=dict(size=12, color="#94a3b8")))
+    fig3.update_layout(legend=dict(orientation="h", y=1.08, x=0, font=dict(size=12, color="#94a3b8")))
     st.plotly_chart(fig3, use_container_width=True, config={"displayModeBar": False})
 
 with col4:
@@ -315,14 +390,19 @@ with col4:
         <div class="section-dot" style="background:#f59e0b;"></div>
         <h3>Normal vs Anomalous</h3>
     </div>""", unsafe_allow_html=True)
+
     label_counts = filtered["anomaly_label_str"].value_counts().reset_index()
     label_counts.columns = ["type", "count"]
+
     fig5 = go.Figure(go.Bar(
         x=label_counts["type"], y=label_counts["count"],
-        marker=dict(color=["#3b82f6" if t == "Normal" else "#ef4444" for t in label_counts["type"]],
-                    cornerradius=6),
+        marker=dict(
+            color=["#3b82f6" if t == "Normal" else "#ef4444" for t in label_counts["type"]],
+            cornerradius=6,
+        ),
         text=label_counts["count"].apply(lambda v: f"{v:,}"),
-        textposition="outside", textfont=dict(size=13, color="#cbd5e1"),
+        textposition="outside",
+        textfont=dict(size=13, color="#cbd5e1"),
         hovertemplate="%{x}: %{y:,}<extra></extra>",
     ))
     dark_layout(fig5, height=180)
@@ -335,11 +415,14 @@ with col4:
         <div class="section-dot" style="background:#10b981;"></div>
         <h3>Risk Score Spread</h3>
     </div>""", unsafe_allow_html=True)
+
     fig4 = go.Figure()
     fig4.add_trace(go.Box(
         y=filtered["ml_risk_score"],
-        marker_color="#7c3aed", line_color="#8b5cf6",
-        fillcolor="rgba(124,58,237,0.15)", boxmean=True,
+        marker_color="#7c3aed",
+        line_color="#8b5cf6",
+        fillcolor="rgba(124,58,237,0.15)",
+        boxmean=True,
         hovertemplate="Score: %{y:.1f}<extra></extra>",
     ))
     dark_layout(fig4, height=160)
@@ -348,35 +431,26 @@ with col4:
     fig4.update_yaxes(title_text="ML Risk Score", title_font=dict(size=11))
     st.plotly_chart(fig4, use_container_width=True, config={"displayModeBar": False})
 
-# ── Top risky users ───────────────────────────────────
 st.markdown("""<div class="section-header">
     <div class="section-dot" style="background:#f43f5e;"></div>
     <h3>Top risky users</h3>
 </div>""", unsafe_allow_html=True)
 
 top_users = (
-    filtered
-    .groupby("user_id")
-    .agg(
-        ml_risk_score  =("ml_risk_score",        "mean"),
-        gov_risk_score =("governance_risk_score", "mean"),
-        role           =("role",                  "first"),
-        anomaly_status =("anomaly_label_str",     "first"),
-        risk_category  =("risk_category",         lambda x: x.mode()[0] if not x.mode().empty else "—"),
-        total_events   =("ml_risk_score",         "count"),
-    )
-    .reset_index()
-    .sort_values("ml_risk_score", ascending=False)
-    .head(10).round(2)
+    user_view
+    .sort_values(["anomaly_label", "ml_risk_score"], ascending=[True, False])
+    .head(10)
     .rename(columns={
-        "user_id":       "User",
-        "role":          "Role",
+        "user_id": "User",
         "ml_risk_score": "ML Score",
-        "gov_risk_score":"Gov. Score",
-        "anomaly_status":"Status",
+        "governance_risk_score": "Gov. Score",
+        "role": "Role",
+        "anomaly_label_str": "Status",
         "risk_category": "Category",
-        "total_events":  "Events",
+        "events": "Events",
     })
+    [["User", "ML Score", "Gov. Score", "Role", "Status", "Category", "Events"]]
+    .round({"ML Score": 1, "Gov. Score": 1})
 )
 
 st.dataframe(
@@ -385,7 +459,7 @@ st.dataframe(
     hide_index=True,
     column_config={
         "ML Score":   st.column_config.ProgressColumn("ML Score",  min_value=0, max_value=100, format="%.1f"),
-        "Gov. Score": st.column_config.ProgressColumn("Gov. Score",min_value=0, max_value=100, format="%.1f"),
+        "Gov. Score": st.column_config.ProgressColumn("Gov. Score", min_value=0, max_value=100, format="%.1f"),
         "Events":     st.column_config.NumberColumn("Events", format="%d"),
     }
 )
